@@ -11,27 +11,106 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Unzip App
+
+      - name: Unzip Web Files
         run: |
-          unzip -o RA-Gaming-Jone-SMALL.zip -d app_src
-          ls -R app_src | head -n 100
+          unzip -o RA-Gaming-Jone-SMALL.zip -d web_src
+          ls -R web_src | head -n 100
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Create Android WebView Project
+        run: |
+          mkdir -p android/app/src/main/assets/www
+          mkdir -p android/app/src/main/java/com/ragaming/jonebd
+          WEB_DIR=$(find web_src -name "index.html" -exec dirname {} \; | head -n 1)
+          echo "Web dir: $WEB_DIR"
+          cp -r "$WEB_DIR"/. android/app/src/main/assets/www/
+
+          cat > android/settings.gradle <<'EOF'
+          rootProject.name = "RA-Gaming-Jone-BD"
+          include ':app'
+          EOF
+
+          cat > android/build.gradle <<'EOF'
+          buildscript {
+            repositories { google(); mavenCentral() }
+            dependencies { classpath 'com.android.application:8.2.2' }
+          }
+          allprojects { repositories { google(); mavenCentral() } }
+          EOF
+
+          cat > android/app/build.gradle <<'EOF'
+          apply plugin: 'com.android.application'
+          android {
+            namespace 'com.ragaming.jonebd'
+            compileSdk 34
+            defaultConfig {
+              applicationId 'com.ragaming.jonebd'
+              minSdk 24
+              targetSdk 34
+              versionCode 1
+              versionName '1.0'
+            }
+            buildTypes { release { minifyEnabled false } }
+            compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+          }
+          EOF
+
+          cat > android/app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.INTERNET" />
+            <application android:allowBackup="true" android:label="RA Gaming Jone BD" android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+              <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize|keyboardHidden">
+                <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+              </activity>
+            </application>
+          </manifest>
+          EOF
+
+          cat > android/app/src/main/java/com/ragaming/jonebd/MainActivity.java <<'EOF'
+          package com.ragaming.jonebd;
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          public class MainActivity extends Activity {
+            @Override protected void onCreate(Bundle s) {
+              super.onCreate(s);
+              WebView w = new WebView(this);
+              setContentView(w);
+              WebSettings st = w.getSettings();
+              st.setJavaScriptEnabled(true);
+              st.setDomStorageEnabled(true);
+              st.setAllowFileAccess(true);
+              st.setMediaPlaybackRequiresUserGesture(false);
+              w.setWebViewClient(new WebViewClient());
+              w.loadUrl("file:///android_asset/www/index.html");
+            }
+            @Override public void onBackPressed() { super.onBackPressed(); }
+          }
+          EOF
+          ls -R android
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+
       - name: Build APK
         run: |
-          APP_DIR=$(find app_src -name "gradlew" -exec dirname {} \; | head -n 1)
-          echo "Found at $APP_DIR"
-          cd "$APP_DIR"
-          chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
+          cd android
+          gradle --no-daemon assembleDebug
           find . -name "*.apk" -type f
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
