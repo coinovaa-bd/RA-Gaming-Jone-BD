@@ -23,6 +23,9 @@ jobs:
         run: |
           cd app-src
           npm install
+          mkdir -p dist
+          cp index.html main.js style.css ads.js admob-config.js ra-gaming-jone-golden-logo.png dist/ || true
+          cp *.html *.js *.css *.png dist/ || true
           npx cap add android || true
           npx cap sync android
           cd android
