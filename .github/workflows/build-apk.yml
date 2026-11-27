@@ -24,8 +24,10 @@ jobs:
           cd app-src
           npm install
           mkdir -p dist
-          cp index.html main.js style.css ads.js admob-config.js ra-gaming-jone-golden-logo.png dist/ || true
+          cp index.html main.js style.css ra-gaming-jone-golden-logo.png dist/ || true
           cp *.html *.js *.css *.png dist/ || true
+          rm -f dist/ads.js dist/admob-config.js
+          sed -i '/admob/d; /ads\.js/d; /AdMob/d' dist/index.html || true
           npx cap add android || true
           npx cap sync android
           cd android
